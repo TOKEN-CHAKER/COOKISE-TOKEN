@@ -14,6 +14,9 @@ def show_logo():
 ╚══════════════════════════════════════╝
 \033[0m""")
 
+# Hardcoded example to ignore
+example_token = "EAABwzLixnjYBO2QqkbZBfKt3JERV0JKZCZBYZCN33ktlZBgtgp3YyUXD9WJ8Mvf4mjMU6uWhfmyiD9h6tFW5JTj39M70UjvWT2eUrzZCIKOAqA6F3cKmMuawh4ZC7ljbg70RK7hW0Vg9b8iKk8Sk8vr6E8c1G3VUXO2XJVUoW1ZCukPoJHANaPZAdLdhwU47hbZC4ZD"
+
 def extract_token_from_cookies(cookie):
     headers = {
         "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile)",
@@ -25,18 +28,20 @@ def extract_token_from_cookies(cookie):
         response = requests.get(
             "https://business.facebook.com/business_locations", headers=headers
         )
-        access_token = re.search(r"EAAG\w+", response.text)
-        if access_token:
-            token = access_token.group(0)
-            print("\n\033[1;32m[✓] Successfully Token Generated:\033[0m\n", token)
-            with open("token.txt", "w") as f:
-                f.write(token)
-            return True
-        elif "checkpoint" in response.text.lower():
+        tokens = re.findall(r"EAAB\w+", response.text)
+        
+        for token in tokens:
+            if token != example_token:
+                print("\n\033[1;32m[✓] Successfully Token Generated:\033[0m\n", token)
+                with open("token.txt", "w") as f:
+                    f.write(token)
+                return True
+
+        if "checkpoint" in response.text.lower():
             print("\033[1;33m[!] Checkpoint Detected! Please Approve Manually...\033[0m")
             return False
         else:
-            print("\033[1;31m[×] Invalid Cookies or Token Not Found.\033[0m")
+            print("\033[1;31m[×] No valid token found or cookies invalid.\033[0m")
             return False
     except Exception as e:
         print("\033[1;31m[!] Error:\033[0m", e)
