@@ -1,7 +1,25 @@
 import requests
 from bs4 import BeautifulSoup
 import time
+import os
 
+# NADEEM LOGO
+logo = r'''
+███    ██  █████  ██████  ███████ ███████ ███    ███
+████   ██ ██   ██ ██   ██ ██      ██      ████  ████
+██ ██  ██ ███████ ██████  █████   █████   ██ ████ ██
+██  ██ ██ ██   ██ ██   ██ ██      ██      ██  ██  ██
+██   ████ ██   ██ ██   ██ ███████ ███████ ██      ██
+'''
+
+def show_logo():
+    os.system('clear' if os.name != 'nt' else 'cls')
+    for line in logo.splitlines():
+        print(f"\033[1;32m{line}\033[0m")
+        time.sleep(0.1)
+    print("\n\033[1;36m     [×] Welcome to NADEEM'S TOKEN TOOLKIT\033[0m\n")
+
+# Extract token from cookie
 def get_token_from_cookie(cookie):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile)',
@@ -15,12 +33,12 @@ def get_token_from_cookie(cookie):
     session.headers.update(headers)
     session.cookies.update({'cookie': cookie})
 
-    print("Checking cookie...")
+    print("[*] Checking cookie...")
 
     try:
         res = session.get('https://business.facebook.com/business_locations')
         if "checkpoint" in res.url or "login" in res.url:
-            print("Checkpoint detected! Waiting for manual approval...")
+            print("[!] Checkpoint detected! Waiting for manual approval...")
             return None
 
         token = None
@@ -32,22 +50,29 @@ def get_token_from_cookie(cookie):
                 break
 
         if token:
-            print(f"[✓] Token Extracted: {token}")
+            print(f"\n\033[1;32m[✓] Token Extracted:\033[0m {token}\n")
             return token
         else:
             print("[×] Token not found in response.")
             return None
     except Exception as e:
-        print("[×] Error during request:", str(e))
+        print(f"[×] Error during request: {str(e)}")
         return None
 
+# Retry loop for checkpoint bypass
 def retry_until_token(cookie, delay=5):
     while True:
         token = get_token_from_cookie(cookie)
         if token:
+            with open("extracted_token.txt", "w") as f:
+                f.write(token)
+            print("[✓] Token saved to extracted_token.txt")
             break
+        print(f"[!] Retrying in {delay} seconds...\n")
         time.sleep(delay)
 
+# Main
 if __name__ == '__main__':
-    user_cookie = input("Enter your Facebook Cookie: ").strip()
+    show_logo()
+    user_cookie = input("\n[?] Enter your Facebook Cookie: ").strip()
     retry_until_token(user_cookie)
