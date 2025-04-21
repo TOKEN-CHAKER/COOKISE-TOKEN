@@ -1,78 +1,62 @@
 import requests
-from bs4 import BeautifulSoup
+import re
 import time
 import os
 
-# NADEEM LOGO
-logo = r'''
-███    ██  █████  ██████  ███████ ███████ ███    ███
-████   ██ ██   ██ ██   ██ ██      ██      ████  ████
-██ ██  ██ ███████ ██████  █████   █████   ██ ████ ██
-██  ██ ██ ██   ██ ██   ██ ██      ██      ██  ██  ██
-██   ████ ██   ██ ██   ██ ███████ ███████ ██      ██
-'''
-
 def show_logo():
-    os.system('clear' if os.name != 'nt' else 'cls')
-    for line in logo.splitlines():
-        print(f"\033[1;32m{line}\033[0m")
-        time.sleep(0.1)
-    print("\n\033[1;36m     [×] Welcome to NADEEM'S TOKEN TOOLKIT\033[0m\n")
+    os.system('clear')
+    print("""
+\033[1;32m╔══════════════════════════════════════╗
+║         𝗕𝗿𝗼𝗸𝗲𝗻 𝗡𝗮𝗱𝗲𝗲𝗺 𝗧𝗼𝗸𝗲𝗻 𝗧𝗼𝗼𝗹         ║
+╠══════════════════════════════════════╣
+║  FB Token Extractor | Termux Ready   ║
+║     Status: CHECKPOINT SAFE          ║
+╚══════════════════════════════════════╝
+\033[0m""")
 
-# Extract token from cookie
-def get_token_from_cookie(cookie):
+def extract_token_from_cookies(cookie):
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile)',
-        'Referer': 'https://business.facebook.com/',
-        'Host': 'business.facebook.com',
-        'Origin': 'https://business.facebook.com',
-        'Connection': 'keep-alive',
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile)",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cookie": cookie,
     }
 
-    session = requests.Session()
-    session.headers.update(headers)
-    session.cookies.update({'cookie': cookie})
-
-    print("[*] Checking cookie...")
-
     try:
-        res = session.get('https://business.facebook.com/business_locations')
-        if "checkpoint" in res.url or "login" in res.url:
-            print("[!] Checkpoint detected! Waiting for manual approval...")
-            return None
-
-        token = None
-        soup = BeautifulSoup(res.text, 'html.parser')
-        for script in soup.find_all('script'):
-            if 'EAAB' in script.text or 'EAAC' in script.text:
-                start = script.text.find('EA')
-                token = script.text[start:start+200].split('"')[0]
-                break
-
-        if token:
-            print(f"\n\033[1;32m[✓] Token Extracted:\033[0m {token}\n")
-            return token
-        else:
-            print("[×] Token not found in response.")
-            return None
-    except Exception as e:
-        print(f"[×] Error during request: {str(e)}")
-        return None
-
-# Retry loop for checkpoint bypass
-def retry_until_token(cookie, delay=5):
-    while True:
-        token = get_token_from_cookie(cookie)
-        if token:
-            with open("extracted_token.txt", "w") as f:
+        response = requests.get(
+            "https://business.facebook.com/business_locations", headers=headers
+        )
+        access_token = re.search(r"EAAG\w+", response.text)
+        if access_token:
+            token = access_token.group(0)
+            print("\n\033[1;32m[✓] Successfully Token Generated:\033[0m\n", token)
+            with open("token.txt", "w") as f:
                 f.write(token)
-            print("[✓] Token saved to extracted_token.txt")
-            break
-        print(f"[!] Retrying in {delay} seconds...\n")
-        time.sleep(delay)
+            return True
+        elif "checkpoint" in response.text.lower():
+            print("\033[1;33m[!] Checkpoint Detected! Please Approve Manually...\033[0m")
+            return False
+        else:
+            print("\033[1;31m[×] Invalid Cookies or Token Not Found.\033[0m")
+            return False
+    except Exception as e:
+        print("\033[1;31m[!] Error:\033[0m", e)
+        return False
 
-# Main
-if __name__ == '__main__':
+def main():
     show_logo()
-    user_cookie = input("\n[?] Enter your Facebook Cookie: ").strip()
-    retry_until_token(user_cookie)
+    cookie = input("\n\033[1;36m[Input] Paste Your Facebook Cookies:\033[0m\n> ").strip()
+
+    while True:
+        success = extract_token_from_cookies(cookie)
+        if success:
+            print("\033[1;32m[✓] Token Saved to token.txt\033[0m")
+            break
+        else:
+            print("\033[1;34m[~] Retrying in 5 seconds...\033[0m")
+            time.sleep(5)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\033[1;31m[!] Interrupted by user. Exiting...\033[0m")
