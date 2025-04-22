@@ -1,88 +1,49 @@
-from flask import Flask, request, render_template_string
+import requests
 import time
+import sys
 
-app = Flask(__name__)
+def log(text):
+    for c in text + '\n':
+        sys.stdout.write(c)
+        sys.stdout.flush()
+        time.sleep(0.01)
 
-HTML_CODE = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Broken Nadeem - Demo FB Reporter</title>
-    <style>
-        body {
-            background: #0d0d0d;
-            font-family: 'Courier New', monospace;
-            color: #fff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .container {
-            background: #1a1a1a;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 0 20px red;
-            text-align: center;
-            width: 320px;
-        }
-        h2 {
-            color: red;
-            margin-bottom: 20px;
-        }
-        input {
-            padding: 10px;
-            width: 80%;
-            border-radius: 8px;
-            border: none;
-            margin-bottom: 20px;
-        }
-        button {
-            padding: 10px 30px;
-            background: red;
-            color: white;
-            font-weight: bold;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-        }
-        .status {
-            margin-top: 20px;
-            color: lime;
-            font-size: 16px;
-        }
-        footer {
-            margin-top: 30px;
-            font-size: 12px;
-            color: gray;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>Broken Nadeem's Report Tool</h2>
-        <form method="POST">
-            <input type="text" name="fb_id" placeholder="Enter Facebook ID" required><br>
-            <button type="submit">Submit</button>
-        </form>
-        {% if status %}
-        <div class="status">{{ status }}</div>
-        {% endif %}
-        <footer>Demo UI Only - No real report sent</footer>
-    </div>
-</body>
-</html>
-'''
+def get_group_user_info(token, thread_id, uid):
+    url = f"https://graph.facebook.com/v19.0/{thread_id}/participants"
+    params = {
+        "access_token": token
+    }
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    status = None
-    if request.method == "POST":
-        fb_id = request.form.get("fb_id")
-        time.sleep(1.5)
-        status = f"Broken Nadeem ne successfully fake report bhej di ID: {fb_id} pe! (Demo Only)"
-    return render_template_string(HTML_CODE, status=status)
+    log("\n[+] Fetching group participants...")
+    res = requests.get(url, params=params)
+
+    if res.status_code != 200:
+        log(f"[-] Failed to fetch participants: {res.json().get('error', {}).get('message', 'Unknown Error')}")
+        return
+
+    data = res.json().get("data", [])
+    found = False
+
+    for user in data:
+        if user.get("id") == uid:
+            found = True
+            name = user.get("name", "Unknown")
+            nickname = user.get("nickname", "No Nickname")
+            log("\n[✓] User Found in Group!")
+            log(f"    [•] Name     : {name}")
+            log(f"    [•] Nickname : {nickname}")
+            break
+
+    if not found:
+        log("\n[!] User not found in the group participants.")
+
+def main():
+    log("\n==== Facebook Group User Logger ====\n")
+    token = input("[+] Enter Access Token: ").strip()
+    thread_id = input("[+] Enter Messenger Thread ID (Group ID): ").strip()
+    uid = input("[+] Enter Target User UID: ").strip()
+
+    get_group_user_info(token, thread_id, uid)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    main()
