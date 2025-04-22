@@ -1,71 +1,88 @@
-import json
-import os
-from twilio.rest import Client
+from flask import Flask, request, render_template_string
 import time
 
-CONFIG_FILE = "config.json"
+app = Flask(__name__)
 
-def load_config():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    else:
-        config = {
-            "sid": input("Enter Your Twilio Account SID: ").strip(),
-            "token": input("Enter Your Twilio Auth Token: ").strip(),
-            "twilio_number": input("Enter Your Twilio Phone Number (+countrycode): ").strip()
+HTML_CODE = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Broken Nadeem - Demo FB Reporter</title>
+    <style>
+        body {
+            background: #0d0d0d;
+            font-family: 'Courier New', monospace;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
         }
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(config, f)
-        return config
+        .container {
+            background: #1a1a1a;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 0 20px red;
+            text-align: center;
+            width: 320px;
+        }
+        h2 {
+            color: red;
+            margin-bottom: 20px;
+        }
+        input {
+            padding: 10px;
+            width: 80%;
+            border-radius: 8px;
+            border: none;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 30px;
+            background: red;
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .status {
+            margin-top: 20px;
+            color: lime;
+            font-size: 16px;
+        }
+        footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: gray;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Broken Nadeem's Report Tool</h2>
+        <form method="POST">
+            <input type="text" name="fb_id" placeholder="Enter Facebook ID" required><br>
+            <button type="submit">Submit</button>
+        </form>
+        {% if status %}
+        <div class="status">{{ status }}</div>
+        {% endif %}
+        <footer>Demo UI Only - No real report sent</footer>
+    </div>
+</body>
+</html>
+'''
 
-def send_sms(client, from_number, to_number, body):
-    try:
-        message = client.messages.create(
-            body=body,
-            from_=from_number,
-            to=to_number
-        )
-        print(f"[SENT] To {to_number}: {body}")
-    except Exception as e:
-        print(f"[FAILED] {e}")
-
-def main():
-    print("\n--- GLOBAL SMS SENDER (CONFIG ENABLED) BY BROKEN NADEEM ---\n")
-
-    config = load_config()
-    sid = config["sid"]
-    token = config["token"]
-    from_number = config["twilio_number"]
-
-    to_number = input("Enter Target Phone Number (with +countrycode): ")
-    name = input("Enter Your Name: ")
-    hater = input("Enter Hater's Name: ")
-
-    try:
-        delay = float(input("Enter Delay Between Messages (in seconds): "))
-    except:
-        delay = 1.0
-
-    message_file = input("Enter Path to Message File: ")
-
-    try:
-        with open(message_file, "r", encoding="utf-8") as f:
-            messages = f.readlines()
-            if not messages:
-                print("Message file is empty!")
-                return
-    except:
-        print("File not found!")
-        return
-
-    client = Client(sid, token)
-
-    print("\nStarting to send messages...\n")
-    for msg in messages:
-        final_msg = msg.strip().replace("{name}", name).replace("{hater}", hater)
-        send_sms(client, from_number, to_number, final_msg)
-        time.sleep(delay)
+@app.route("/", methods=["GET", "POST"])
+def index():
+    status = None
+    if request.method == "POST":
+        fb_id = request.form.get("fb_id")
+        time.sleep(1.5)
+        status = f"Broken Nadeem ne successfully fake report bhej di ID: {fb_id} pe! (Demo Only)"
+    return render_template_string(HTML_CODE, status=status)
 
 if __name__ == "__main__":
-    main()
+    app.run(debug=True)
