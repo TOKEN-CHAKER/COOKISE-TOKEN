@@ -1,73 +1,55 @@
 import requests
 import time
-import os
 
-def clear():
-    os.system('clear' if os.name == 'posix' else 'cls')
+def check_token_validity(token):
+    url = f"https://graph.facebook.com/v18.0/me?access_token={token}"
+    res = requests.get(url).json()
+    return res.get("id") is not None
 
-def slow_print(msg):
-    for c in msg:
-        print(c, end='', flush=True)
-        time.sleep(0.02)
-    print()
+def is_valid_messenger_group(token, group_id):
+    url = f"https://graph.facebook.com/v18.0/{group_id}?access_token={token}"
+    res = requests.get(url).json()
+    return "id" in res
 
-def get_group_name(convo_id, token):
-    url = f'https://graph.facebook.com/v19.0/{convo_id}?fields=name&access_token={token}'
-    res = requests.get(url)
-    if res.status_code == 200:
-        return res.json().get('name')
-    return None
-
-def get_last_changer(convo_id, token):
-    url = f'https://graph.facebook.com/v19.0/{convo_id}/messages?limit=5&access_token={token}'
-    res = requests.get(url)
-    if res.status_code == 200:
-        data = res.json().get('data', [])
-        for msg in data:
-            if 'changed the name' in msg.get('message', ''):
-                return msg.get('from', {}).get('id')
-    return None
-
-def set_group_name(convo_id, token, name):
-    url = f'https://graph.facebook.com/v19.0/{convo_id}'
+def change_group_name(token, group_id, new_name):
+    url = f"https://graph.facebook.com/v18.0/{group_id}"
     payload = {
-        'name': name,
-        'access_token': token
+        "name": new_name,
+        "access_token": token
     }
-    res = requests.post(url, data=payload)
-    return res.status_code == 200
+    res = requests.post(url, data=payload).json()
+    return "success" in res and res["success"]
 
-def lock_loop(convo_id, token, locked_name, allowed_uid):
-    while True:
-        current_name = get_group_name(convo_id, token)
-        if current_name and current_name != locked_name:
-            changer_uid = get_last_changer(convo_id, token)
-            if changer_uid and changer_uid != allowed_uid:
-                print(f"[!] Unauthorized name change by UID {changer_uid} — restoring...")
-                set_group_name(convo_id, token, locked_name)
-            else:
-                print("[=] Name changed by authorized user, no action taken.")
-        else:
-            print("[=] Name is locked correctly.")
-        time.sleep(10)
+def lock_group_name():
+    print("<<< Messenger Group Name Lock v2 - Authorized Edition >>>")
+    token = input("[+] Enter your access token: ").strip()
+    uid = input("[+] Enter your UID (allowed to change name): ").strip()
+    group_id = input("[+] Enter Messenger Group UID: ").strip()
+    new_name = input("[+] Enter group name to lock: ").strip()
 
-if __name__ == '__main__':
-    clear()
-    slow_print("    <<< Messenger Group Name Lock v2 - Authorized Edition >>>\n")
-
-    token = input("[+] Enter your access token: ")
-    allowed_uid = input("[+] Enter your UID (allowed to change name): ")
-    convo_id = input("[+] Enter Messenger Group UID: ")
-    locked_name = input("[+] Enter group name to lock: ")
-
-    slow_print("\n[*] Activating smart lock system...")
+    print("\n[*] Activating smart lock system...")
     time.sleep(1)
 
-    current_name = get_group_name(convo_id, token)
-    if current_name:
-        set_group_name(convo_id, token, locked_name)
-        slow_print("\n[+] Name Lock Activated with Authorized Control!")
-        print("[*] Monitoring name changes...\n")
-        lock_loop(convo_id, token, locked_name, allowed_uid)
+    if not check_token_validity(token):
+        print("[-] Invalid token. Please check and try again.")
+        return
+
+    if not is_valid_messenger_group(token, group_id):
+        print("[-] Failed to fetch group info. Check token or group UID.")
+        return
+
+    print("[+] Group validated.")
+    time.sleep(0.5)
+
+    print(f"[*] Locking group name to: {new_name} ...")
+    time.sleep(1)
+
+    success = change_group_name(token, group_id, new_name)
+    if success:
+        print(f"[+] Group name successfully locked as: {new_name}")
+        print("[*] Smart Lock Activated by Broken Nadeem.")
     else:
-        print("[-] Failed to fetch group info. Check token or UID.")
+        print("[-] Failed to change group name. Possible permission error.")
+
+if __name__ == "__main__":
+    lock_group_name()
