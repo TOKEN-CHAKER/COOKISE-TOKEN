@@ -1,6 +1,4 @@
-import requests
-import time
-import os
+import requests, time, os
 
 def clear(): os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -15,18 +13,18 @@ def validate_token(token):
     res = requests.get(url).json()
     if "id" in res:
         print(f"[+] Token valid for user: {res['name']} ({res['id']})")
-        return res['id']
+        return True
     else:
         print("[-] Invalid token.")
-        return None
+        return False
 
 def lock_name_loop(token, thread_id, uid, lock_name):
     url = f"https://graph.facebook.com/v18.0/{thread_id}/participants/{uid}"
     headers = {
-        'Authorization': f'Bearer {token}'
+        "Authorization": f"OAuth {token}"
     }
     data = {
-        'nickname': lock_name
+        "nickname": lock_name
     }
 
     while True:
@@ -37,7 +35,7 @@ def lock_name_loop(token, thread_id, uid, lock_name):
             print(f"[+] Group name locked to: {lock_name}")
             break
         else:
-            print("[-] Failed to lock. Retrying in 5 seconds...")
+            print(f"[-] Failed to lock. Retrying in 5 seconds...")
             time.sleep(5)
 
 if __name__ == "__main__":
