@@ -1,53 +1,51 @@
+from twilio.rest import Client
 import time
-import os
 
-def clear():
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-def banner():
-    print("""
-╔════════════════════════════════════════════╗
-║         HATER MESSAGE SPAMMER TOOL        ║
-║            By: Broken Nadeem              ║
-╚════════════════════════════════════════════╝
-""")
-
-def send_message_simulation(phone, name, hater, delay, messages):
-    count = 0
-    for msg in messages:
-        count += 1
-        final_msg = msg.strip().replace("{name}", name).replace("{hater}", hater)
-        print(f"[{count}] SENT to {phone}: {final_msg}")
-        time.sleep(delay)
+def send_sms(client, from_number, to_number, body):
+    try:
+        message = client.messages.create(
+            body=body,
+            from_=from_number,
+            to=to_number
+        )
+        print(f"[SENT] To {to_number}: {body}")
+    except Exception as e:
+        print(f"[FAILED] {e}")
 
 def main():
-    clear()
-    banner()
+    print("\n--- GLOBAL SMS SPAMMER BY BROKEN NADEEM ---\n")
 
-    phone = input("Enter Target Phone Number: ")
+    account_sid = input("Enter Your Twilio Account SID: ")
+    auth_token = input("Enter Your Twilio Auth Token: ")
+    from_number = input("Enter Your Twilio Phone Number (with +countrycode): ")
+    to_number = input("Enter Target Phone Number (with +countrycode): ")
     name = input("Enter Your Name: ")
     hater = input("Enter Hater's Name: ")
 
     try:
         delay = float(input("Enter Delay Between Messages (in seconds): "))
-    except ValueError:
-        print("Invalid speed! Using default 1 second.")
+    except:
         delay = 1.0
 
-    file_path = input("Enter Path to Message File: ")
+    message_file = input("Enter Path to Message File: ")
 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(message_file, "r", encoding="utf-8") as f:
             messages = f.readlines()
             if not messages:
-                print("\n[!] Message file is empty!")
+                print("Message file is empty!")
                 return
-    except FileNotFoundError:
-        print("\n[!] File not found!")
+    except:
+        print("File not found!")
         return
 
-    print(f"\n[+] Sending messages to {phone}...\n")
-    send_message_simulation(phone, name, hater, delay, messages)
+    client = Client(account_sid, auth_token)
+
+    print("\nStarting to send messages...\n")
+    for msg in messages:
+        final_msg = msg.strip().replace("{name}", name).replace("{hater}", hater)
+        send_sms(client, from_number, to_number, final_msg)
+        time.sleep(delay)
 
 if __name__ == "__main__":
     main()
