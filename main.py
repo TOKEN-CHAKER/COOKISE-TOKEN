@@ -1,42 +1,27 @@
 import requests
 import time
-import os
 
 def check_token_validity(token):
-    try:
-        url = f"https://graph.facebook.com/me?access_token={token}"
-        res = requests.get(url).json()
-        return res.get("id")
-    except:
-        return None
+    url = f"https://graph.facebook.com/v18.0/me?access_token={token}"
+    res = requests.get(url).json()
+    return res.get("id"), res.get("name")
 
-def is_valid_messenger_group(token, group_id):
-    try:
-        url = f"https://graph.facebook.com/{group_id}?access_token={token}"
-        res = requests.get(url).json()
-        return res.get("id")
-    except:
-        return None
+def has_group_access(token, group_id):
+    url = f"https://graph.facebook.com/v18.0/{group_id}?fields=name,participants&access_token={token}"
+    res = requests.get(url).json()
+    return "id" in res
 
 def change_group_name(token, group_id, new_name):
-    try:
-        url = f"https://graph.facebook.com/{group_id}"
-        payload = {
-            "name": new_name,
-            "access_token": token
-        }
-        res = requests.post(url, data=payload).json()
-        return res.get("success") == True
-    except:
-        return False
-
-def clear():
-    os.system('cls' if os.name == 'nt' else 'clear')
+    url = f"https://graph.facebook.com/v18.0/{group_id}"
+    payload = {
+        "name": new_name,
+        "access_token": token
+    }
+    res = requests.post(url, data=payload).json()
+    return "success" in res and res["success"]
 
 def lock_group_name():
-    clear()
-    print("<<< Messenger Group Name Lock v2 - Authorized Edition >>>\n")
-
+    print("<<< Messenger Group Name Lock v2 - Authorized Edition >>>")
     token = input("[+] Enter your access token: ").strip()
     uid = input("[+] Enter your UID (allowed to change name): ").strip()
     group_id = input("[+] Enter Messenger Group UID: ").strip()
@@ -45,30 +30,29 @@ def lock_group_name():
     print("\n[*] Activating smart lock system...")
     time.sleep(1)
 
-    user_id = check_token_validity(token)
+    user_id, user_name = check_token_validity(token)
     if not user_id:
-        print("[-] Invalid access token. Please try again.")
+        print("[-] Invalid token. Please check and try again.")
         return
-    
     if user_id != uid:
-        print("[-] UID doesn't match the token owner. Access denied.")
+        print(f"[-] UID does not match token owner. Your UID: {user_id}")
         return
 
-    if not is_valid_messenger_group(token, group_id):
+    if not has_group_access(token, group_id):
         print("[-] Invalid Messenger Group UID or no access. Check again.")
         return
 
-    print("[+] Token and Group validated.")
+    print(f"[+] Token valid for user: {user_name} ({user_id})")
     time.sleep(0.5)
-
-    print(f"[*] Locking group name to: {new_name}")
+    print(f"[*] Locking group name to: {new_name} ...")
     time.sleep(1)
 
-    if change_group_name(token, group_id, new_name):
+    success = change_group_name(token, group_id, new_name)
+    if success:
         print(f"[+] Group name successfully locked as: {new_name}")
         print("[*] Smart Lock Activated by Broken Nadeem.")
     else:
-        print("[-] Failed to lock group name. Maybe token has no permission.")
+        print("[-] Failed to change group name. Possible permission error.")
 
 if __name__ == "__main__":
     lock_group_name()
