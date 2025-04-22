@@ -6,8 +6,16 @@ def check_token_validity(token):
     res = requests.get(url).json()
     return res.get("id"), res.get("name")
 
+def is_group_admin(token, group_id):
+    url = f"https://graph.facebook.com/v18.0/{group_id}/admins?access_token={token}"
+    res = requests.get(url).json()
+    if 'data' not in res:
+        return False
+    my_id, _ = check_token_validity(token)
+    return any(admin["id"] == my_id for admin in res["data"])
+
 def has_group_access(token, group_id):
-    url = f"https://graph.facebook.com/v18.0/{group_id}?fields=name,participants&access_token={token}"
+    url = f"https://graph.facebook.com/v18.0/{group_id}?access_token={token}"
     res = requests.get(url).json()
     return "id" in res
 
@@ -18,7 +26,7 @@ def change_group_name(token, group_id, new_name):
         "access_token": token
     }
     res = requests.post(url, data=payload).json()
-    return "success" in res and res["success"]
+    return res.get("success") == True
 
 def lock_group_name():
     print("<<< Messenger Group Name Lock v2 - Authorized Edition >>>")
@@ -38,21 +46,24 @@ def lock_group_name():
         print(f"[-] UID does not match token owner. Your UID: {user_id}")
         return
 
+    print(f"[+] Token valid for user: {user_name} ({user_id})")
+
     if not has_group_access(token, group_id):
         print("[-] Invalid Messenger Group UID or no access. Check again.")
         return
 
-    print(f"[+] Token valid for user: {user_name} ({user_id})")
-    time.sleep(0.5)
+    if not is_group_admin(token, group_id):
+        print("[-] Token is not admin in this group. Cannot lock the name.")
+        return
+
     print(f"[*] Locking group name to: {new_name} ...")
     time.sleep(1)
 
-    success = change_group_name(token, group_id, new_name)
-    if success:
+    if change_group_name(token, group_id, new_name):
         print(f"[+] Group name successfully locked as: {new_name}")
         print("[*] Smart Lock Activated by Broken Nadeem.")
     else:
-        print("[-] Failed to change group name. Possible permission error.")
+        print("[-] Failed to change group name. Maybe permission error or Facebook limit.")
 
 if __name__ == "__main__":
     lock_group_name()
