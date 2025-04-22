@@ -1,67 +1,72 @@
+from flask import Flask, request, render_template_string
 import requests
 import re
-import time
-import os
 
-def show_logo():
-    os.system('clear')
-    print("""
-\033[1;32m╔══════════════════════════════════════╗
-║         𝗕𝗿𝗼𝗸𝗲𝗻 𝗡𝗮𝗱𝗲𝗲𝗺 𝗧𝗼𝗸𝗲𝗻 𝗧𝗼𝗼𝗹         ║
-╠══════════════════════════════════════╣
-║  FB Token Extractor | Termux Ready   ║
-║     Status: CHECKPOINT SAFE          ║
-╚══════════════════════════════════════╝
-\033[0m""")
+app = Flask(__name__)
 
-# Hardcoded example to ignore
-example_token = "EAABwzLixnjYBO2QqkbZBfKt3JERV0JKZCZBYZCN33ktlZBgtgp3YyUXD9WJ8Mvf4mjMU6uWhfmyiD9h6tFW5JTj39M70UjvWT2eUrzZCIKOAqA6F3cKmMuawh4ZC7ljbg70RK7hW0Vg9b8iKk8Sk8vr6E8c1G3VUXO2XJVUoW1ZCukPoJHANaPZAdLdhwU47hbZC4ZD"
+HTML = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Termux Token Extractor - Broken Nadeem</title>
+    <style>
+        body {
+            background:#000; color:#0f0; font-family:monospace; padding:30px;
+        }
+        textarea, input { width:100%; padding:10px; background:#111; color:#0f0; border:1px solid #0f0; }
+        button { background:#0f0; color:#000; padding:10px 20px; margin-top:10px; cursor:pointer; font-weight:bold; }
+        .box { background:#111; padding:20px; margin-top:20px; border:1px solid #0f0; }
+    </style>
+</head>
+<body>
+    <h1>Broken Nadeem - Token Extractor (Termux)</h1>
+    <form method="POST">
+        <label>Paste Facebook Cookies:</label><br>
+        <textarea name="cookie" rows="6" required></textarea><br>
+        <button type="submit">Extract Token</button>
+    </form>
 
-def extract_token_from_cookies(cookie):
+    {% if token %}
+    <div class="box">
+        <h3>Token Found:</h3>
+        <textarea rows="3">{{ token }}</textarea>
+    </div>
+    {% elif error %}
+    <div class="box" style="color:red;">
+        <h3>Error:</h3>
+        <p>{{ error }}</p>
+    </div>
+    {% endif %}
+</body>
+</html>
+'''
+
+def extract_token(cookie):
     headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile)",
-        "Accept-Language": "en-US,en;q=0.9",
         "Cookie": cookie,
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile; rv:91.0) Gecko/91.0 Firefox/91.0"
     }
-
     try:
-        response = requests.get(
-            "https://business.facebook.com/business_locations", headers=headers
-        )
-        tokens = re.findall(r"EAAB\w+", response.text)
-        
-        for token in tokens:
-            if token != example_token:
-                print("\n\033[1;32m[✓] Successfully Token Generated:\033[0m\n", token)
-                with open("token.txt", "w") as f:
-                    f.write(token)
-                return True
-
-        if "checkpoint" in response.text.lower():
-            print("\033[1;33m[!] Checkpoint Detected! Please Approve Manually...\033[0m")
-            return False
+        response = requests.get("https://business.facebook.com/business_locations", headers=headers)
+        token_match = re.search(r'EAAG\w+', response.text)
+        if token_match:
+            return token_match.group(0)
         else:
-            print("\033[1;31m[×] No valid token found or cookies invalid.\033[0m")
-            return False
+            raise Exception("Token not found. Invalid cookie or checkpointed account.")
     except Exception as e:
-        print("\033[1;31m[!] Error:\033[0m", e)
-        return False
+        raise e
 
-def main():
-    show_logo()
-    cookie = input("\n\033[1;36m[Input] Paste Your Facebook Cookies:\033[0m\n> ").strip()
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    token = None
+    error = None
+    if request.method == 'POST':
+        cookie = request.form.get("cookie")
+        try:
+            token = extract_token(cookie)
+        except Exception as e:
+            error = str(e)
+    return render_template_string(HTML, token=token, error=error)
 
-    while True:
-        success = extract_token_from_cookies(cookie)
-        if success:
-            print("\033[1;32m[✓] Token Saved to token.txt\033[0m")
-            break
-        else:
-            print("\033[1;34m[~] Retrying in 5 seconds...\033[0m")
-            time.sleep(5)
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\033[1;31m[!] Interrupted by user. Exiting...\033[0m")
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
