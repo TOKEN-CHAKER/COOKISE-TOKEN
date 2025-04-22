@@ -1,5 +1,23 @@
+import json
+import os
 from twilio.rest import Client
 import time
+
+CONFIG_FILE = "config.json"
+
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    else:
+        config = {
+            "sid": input("Enter Your Twilio Account SID: ").strip(),
+            "token": input("Enter Your Twilio Auth Token: ").strip(),
+            "twilio_number": input("Enter Your Twilio Phone Number (+countrycode): ").strip()
+        }
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config, f)
+        return config
 
 def send_sms(client, from_number, to_number, body):
     try:
@@ -13,11 +31,13 @@ def send_sms(client, from_number, to_number, body):
         print(f"[FAILED] {e}")
 
 def main():
-    print("\n--- GLOBAL SMS SPAMMER BY BROKEN NADEEM ---\n")
+    print("\n--- GLOBAL SMS SENDER (CONFIG ENABLED) BY BROKEN NADEEM ---\n")
 
-    account_sid = input("Enter Your Twilio Account SID: ")
-    auth_token = input("Enter Your Twilio Auth Token: ")
-    from_number = input("Enter Your Twilio Phone Number (with +countrycode): ")
+    config = load_config()
+    sid = config["sid"]
+    token = config["token"]
+    from_number = config["twilio_number"]
+
     to_number = input("Enter Target Phone Number (with +countrycode): ")
     name = input("Enter Your Name: ")
     hater = input("Enter Hater's Name: ")
@@ -39,7 +59,7 @@ def main():
         print("File not found!")
         return
 
-    client = Client(account_sid, auth_token)
+    client = Client(sid, token)
 
     print("\nStarting to send messages...\n")
     for msg in messages:
