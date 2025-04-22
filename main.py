@@ -1,72 +1,47 @@
-from flask import Flask, request, render_template_string
 import requests
 import re
 
-app = Flask(__name__)
+BANNER = """
+\033[1;32m
+██████╗ ██████╗  ██████╗ ██╗  ██╗███████╗███╗   ██╗
+██╔══██╗██╔══██╗██╔═══██╗██║ ██╔╝██╔════╝████╗  ██║
+██████╔╝██████╔╝██║   ██║█████╔╝ █████╗  ██╔██╗ ██║
+██╔═══╝ ██╔═══╝ ██║   ██║██╔═██╗ ██╔══╝  ██║╚██╗██║
+██║     ██║     ╚██████╔╝██║  ██╗███████╗██║ ╚████║
+╚═╝     ╚═╝      ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝
 
-HTML = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Termux Token Extractor - Broken Nadeem</title>
-    <style>
-        body {
-            background:#000; color:#0f0; font-family:monospace; padding:30px;
-        }
-        textarea, input { width:100%; padding:10px; background:#111; color:#0f0; border:1px solid #0f0; }
-        button { background:#0f0; color:#000; padding:10px 20px; margin-top:10px; cursor:pointer; font-weight:bold; }
-        .box { background:#111; padding:20px; margin-top:20px; border:1px solid #0f0; }
-    </style>
-</head>
-<body>
-    <h1>Broken Nadeem - Token Extractor (Termux)</h1>
-    <form method="POST">
-        <label>Paste Facebook Cookies:</label><br>
-        <textarea name="cookie" rows="6" required></textarea><br>
-        <button type="submit">Extract Token</button>
-    </form>
-
-    {% if token %}
-    <div class="box">
-        <h3>Token Found:</h3>
-        <textarea rows="3">{{ token }}</textarea>
-    </div>
-    {% elif error %}
-    <div class="box" style="color:red;">
-        <h3>Error:</h3>
-        <p>{{ error }}</p>
-    </div>
-    {% endif %}
-</body>
-</html>
-'''
+         Facebook Cookie Token Extractor
+                Coded by Broken Nadeem
+\033[0m
+"""
 
 def extract_token(cookie):
     headers = {
         "Cookie": cookie,
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile; rv:91.0) Gecko/91.0 Firefox/91.0"
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 Chrome/89.0 Safari/537.36"
     }
     try:
         response = requests.get("https://business.facebook.com/business_locations", headers=headers)
-        token_match = re.search(r'EAAG\w+', response.text)
-        if token_match:
-            return token_match.group(0)
+        token = re.search(r'EAAG\w+', response.text)
+        if token:
+            return token.group(0)
         else:
-            raise Exception("Token not found. Invalid cookie or checkpointed account.")
+            return None
     except Exception as e:
-        raise e
+        print(f"\033[1;31m[!] Error while requesting: {str(e)}\033[0m")
+        return None
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    token = None
-    error = None
-    if request.method == 'POST':
-        cookie = request.form.get("cookie")
-        try:
-            token = extract_token(cookie)
-        except Exception as e:
-            error = str(e)
-    return render_template_string(HTML, token=token, error=error)
+def main():
+    print(BANNER)
+    cookie = input("\033[1;36m[+] Paste your Facebook Cookie:\033[0m ").strip()
+    print("\n\033[1;33m[*] Extracting token... Please wait...\033[0m\n")
+
+    token = extract_token(cookie)
+
+    if token:
+        print(f"\033[1;32m[✓] Token Found:\033[0m {token}")
+    else:
+        print("\033[1;31m[✗] Token not found. Invalid or checkpointed cookie.\033[0m")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    main()
