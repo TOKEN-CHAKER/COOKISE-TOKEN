@@ -1,109 +1,77 @@
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, request, jsonify
+import threading
 import requests
-import os
+import time
 
 app = Flask(__name__)
 
-group_id = "61573436296849"
-nickname_lock = True
-name_lock = True
+# CONFIG
+GROUP_ID = "9306787302780384"
+ADMIN_UIDS = ["61573436296849"]
+lock_active = False
 
-# === Load Token & Get Admin UID ===
-def load_token():
-    if os.path.exists("token.txt"):
-        with open("token.txt", "r") as f:
-            return f.read().strip()
-    return ""
 
-def get_admin_uid(token):
-    url = f"https://graph.facebook.com/me?access_token={token}"
-    res = requests.get(url).json()
-    return res.get("id", "")
+def get_token():
+    with open("token.txt", "r") as f:
+        return f.read().strip()
 
-AUTHORIZED_UID = get_admin_uid(load_token())
 
-# === Lock Functions ===
-def set_nickname(token):
-    url = f"https://graph.facebook.com/v20.0/{group_id}/participants/me/nickname"
-    payload = {"nickname": "Locked by Broken Nadeem", "access_token": token}
-    return requests.post(url, data=payload).json()
+def lock_group_name():
+    global lock_active
+    token = get_token()
+    while lock_active:
+        try:
+            response = requests.post(
+                f"https://graph.facebook.com/v20.0/{GROUP_ID}",
+                data={
+                    "access_token": token,
+                    "name": "Locked by Broken Nadeem"
+                }
+            )
+            print("Lock response:", response.text)
+        except Exception as e:
+            print("Error locking group name:", e)
+        time.sleep(5)
 
-def set_group_name(token, name="Locked Group by Broken Nadeem"):
-    url = f"https://graph.facebook.com/v20.0/{group_id}"
-    payload = {"name": name, "access_token": token}
-    return requests.post(url, data=payload).json()
 
-def process_command(cmd, token):
-    global nickname_lock, name_lock
-    if cmd == "start":
-        nickname_lock = True
-        name_lock = True
-        return {"status": "success", "message": "Locker started"}
-    elif cmd == "reset":
-        nickname_lock = False
-        name_lock = False
-        return {"status": "reset", "message": "Locker stopped"}
-    elif cmd == "name lock":
-        res1 = set_nickname(token)
-        res2 = set_group_name(token)
-        return {"status": "locked", "nickname_result": res1, "groupname_result": res2}
-    elif cmd == "info":
-        return {"status": "info", "nickname_lock": nickname_lock, "name_lock": name_lock}
-    else:
-        return {"status": "error", "message": f"Unknown command: {cmd}"}
+@app.route("/", methods=["GET"])
+def block_browser():
+    return "Access Denied", 403
 
-# === Web UI ===
-html_ui = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Group Name Locker</title>
-    <style>
-        body { background: #000; color: #0f0; font-family: monospace; text-align: center; margin-top: 40px; }
-        input, button { margin: 8px; padding: 10px; background: #111; color: #0f0; border: 1px solid #0f0; }
-    </style>
-</head>
-<body>
-    <h1>Messenger Group Locker</h1>
-    <input type="text" id="uid" placeholder="Your Facebook UID"><br>
-    <input type="text" id="command" placeholder="Command (start, name lock, reset, info)"><br>
-    <button onclick="sendCommand()">Execute</button>
-    <pre id="output"></pre>
-<script>
-function sendCommand() {
-    fetch("/command", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            uid: document.getElementById("uid").value,
-            command: document.getElementById("command").value
-        })
-    }).then(res => res.json())
-    .then(data => {
-        document.getElementById("output").innerText = JSON.stringify(data, null, 2);
-    });
-}
-</script>
-</body>
-</html>
-'''
 
-@app.route("/")
-def home():
-    return render_template_string(html_ui)
+@app.route("/webhook", methods=["POST"])
+def receive_command():
+    global lock_active
 
-@app.route("/command", methods=["POST"])
-def command():
     data = request.json
-    uid = data.get("uid")
-    cmd = data.get("command")
-    token = load_token()
+    try:
+        messaging_event = data['entry'][0]['messaging'][0]
+        sender_id = str(messaging_event['sender']['id'])
+        message = messaging_event['message']['text'].strip().lower()
+    except Exception as e:
+        print("Webhook error:", e)
+        return jsonify({"status": "error", "message": "Invalid structure"})
 
-    if uid != AUTHORIZED_UID:
-        return jsonify({"status": "error", "message": "Unauthorized user!"})
+    if sender_id not in ADMIN_UIDS:
+        return jsonify({"status": "unauthorized"})
 
-    result = process_command(cmd, token)
-    return jsonify(result)
+    if message == "start":
+        return jsonify({"status": "success", "message": "Locker is ready"})
+
+    elif message == "name lock":
+        if not lock_active:
+            lock_active = True
+            threading.Thread(target=lock_group_name).start()
+            return jsonify({"status": "started", "message": "Name lock initiated"})
+        else:
+            return jsonify({"status": "running", "message": "Name lock already active"})
+
+    elif message == "reset":
+        lock_active = False
+        return jsonify({"status": "stopped", "message": "Locker reset"})
+
+    return jsonify({"status": "ignored", "message": "Command not recognized"})
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=10000)
