@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 # CONFIG
 GROUP_ID = "9306787302780384"
-ADMIN_UIDS = ["61573436296849"]
+ADMIN_UIDS = ["61571843423018"]
 lock_active = False
 
 
