@@ -1,6 +1,6 @@
 from flask import Flask, request
 from playwright.sync_api import sync_playwright
-import threading, time
+import threading
 
 app = Flask(__name__)
 
@@ -37,26 +37,21 @@ def lock_nickname(c_user, xs, group_url, target_uid, nickname):
         page = context.new_page()
 
         try:
-            print("[*] Navigating to Messenger group...")
-            page.goto(group_url)
-            time.sleep(10)
+            page.goto(group_url, timeout=60000)
+            page.wait_for_timeout(10000)
 
-            print("[*] Opening chat settings...")
             page.click("text=Chat Settings")
-            time.sleep(2)
+            page.wait_for_timeout(2000)
 
-            print("[*] Opening Nicknames section...")
             page.click("text=Nicknames")
-            time.sleep(2)
+            page.wait_for_timeout(2000)
 
-            print("[*] Selecting user...")
             page.click(f"[href*='{target_uid}']")
-            time.sleep(1)
+            page.wait_for_timeout(1000)
 
-            print(f"[*] Locking nickname: {nickname}")
-            page.fill('input[placeholder=\"Enter nickname\"]', nickname)
+            page.fill('input[placeholder="Enter nickname"]', nickname)
             page.click("text=Save")
-            time.sleep(2)
+            page.wait_for_timeout(2000)
 
             print("[+] Nickname locked successfully!")
         except Exception as e:
@@ -67,13 +62,12 @@ def lock_nickname(c_user, xs, group_url, target_uid, nickname):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        c_user = request.form['c_user']
-        xs = request.form['xs']
-        group_url = request.form['group_url']
-        target_uid = request.form['target_uid']
-        nickname = request.form['nickname']
-        threading.Thread(target=lock_nickname, args=(c_user, xs, group_url, target_uid, nickname)).start()
-        return "<h2 style='color:#0f0;background:#111;padding:10px;'>Nickname lock started! Check Termux logs.</h2>"
+        data = request.form
+        threading.Thread(target=lock_nickname, args=(
+            data['c_user'], data['xs'], data['group_url'],
+            data['target_uid'], data['nickname']
+        )).start()
+        return "<h2 style='color:#0f0;background:#111;padding:10px;'>Nickname lock started! Check logs in Termux.</h2>"
     return HTML_FORM
 
 if __name__ == '__main__':
