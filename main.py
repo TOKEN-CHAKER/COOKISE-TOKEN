@@ -1,50 +1,48 @@
-import requests, time, os
+from playwright.sync_api import sync_playwright
+import time
 
-def clear(): os.system('cls' if os.name == 'nt' else 'clear')
+def lock_nickname(c_user, xs, group_url, target_uid, nickname):
+    cookies = [
+        {"name": "c_user", "value": c_user, "domain": ".facebook.com", "path": "/"},
+        {"name": "xs", "value": xs, "domain": ".facebook.com", "path": "/"},
+    ]
 
-def banner():
-    clear()
-    print("<<< Messenger Group Name Lock v2 - Authorized Edition >>>")
-    print("        Coded & Modified by Broken Nadeem")
-    print("------------------------------------------------------------")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context()
 
-def validate_token(token):
-    url = f"https://graph.facebook.com/me?access_token={token}"
-    res = requests.get(url).json()
-    if "id" in res:
-        print(f"[+] Token valid for user: {res['name']} ({res['id']})")
-        return True
-    else:
-        print("[-] Invalid token.")
-        return False
+        context.add_cookies(cookies)
+        page = context.new_page()
 
-def lock_name_loop(token, thread_id, uid, lock_name):
-    url = f"https://graph.facebook.com/v18.0/{thread_id}/participants/{uid}"
-    headers = {
-        "Authorization": f"OAuth {token}"
-    }
-    data = {
-        "nickname": lock_name
-    }
+        print("[*] Opening Messenger thread...")
+        page.goto(group_url)
+        time.sleep(10)
 
-    while True:
-        r = requests.post(url, headers=headers, data=data)
-        res = r.json()
+        print("[*] Opening group settings...")
+        page.click("text=Chat Settings")
+        time.sleep(2)
 
-        if "error" not in res:
-            print(f"[+] Group name locked to: {lock_name}")
-            break
-        else:
-            print(f"[-] Failed to lock. Retrying in 5 seconds...")
-            time.sleep(5)
+        print("[*] Searching for UID...")
+        page.click("text=Nicknames")
+        time.sleep(2)
 
-if __name__ == "__main__":
-    banner()
-    token = input("[+] Enter your access token: ").strip()
-    uid = input("[+] Enter your UID (allowed to change name): ").strip()
-    thread_id = input("[+] Enter Messenger Group UID: ").strip()
-    lock_name = input("[+] Enter group name to lock: ").strip()
+        selector = f"[href*='{target_uid}']"
+        page.click(selector)
+        time.sleep(1)
 
-    print("\n[*] Activating smart lock system...")
-    if validate_token(token):
-        lock_name_loop(token, thread_id, uid, lock_name)
+        print(f"[*] Setting nickname: {nickname}")
+        page.fill('input[placeholder="Enter nickname"]', nickname)
+        page.click("text=Save")
+        time.sleep(3)
+
+        print("[+] Nickname locked successfully!")
+        browser.close()
+
+# === USER INPUT SECTION ===
+c_user = input("Enter your c_user cookie: ").strip()
+xs = input("Enter your xs cookie: ").strip()
+group_url = input("Enter Messenger group URL (like https://www.messenger.com/t/12345678): ").strip()
+target_uid = input("Enter UID of the user to lock nickname: ").strip()
+nickname = input("Enter nickname to lock: ").strip()
+
+lock_nickname(c_user, xs, group_url, target_uid, nickname)
