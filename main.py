@@ -1,109 +1,55 @@
-from flask import Flask, request
-import requests, threading, time
+from flask import Flask, request, render_template_string import requests, threading, time
 
-app = Flask(__name__)
+app = Flask(name)
 
-HTML_FORM = """
-<!DOCTYPE html>
-<html>
+ADMIN_UID = "61573436296849" GROUP_ID = "<YOUR_GROUP_ID>"  # Replace with your group ID ACCESS_TOKEN = "<YOUR_ACCESS_TOKEN>"  # Replace with your group access token
+
+status = { "bot_active": False, "lock_active": False, "nickname": "", "target_uid": "", "cookies": {} }
+
+HTML_TEMPLATE = """
+
+<!DOCTYPE html><html>
 <head>
-    <title>Broken Nadeem | Group Nickname Lock</title>
+    <title>Broken Nadeem | Animated Nickname Locker</title>
     <style>
         body {
             background-color: #000;
             color: #0f0;
-            font-family: monospace;
+            font-family: 'Courier New', Courier, monospace;
             text-align: center;
-            padding-top: 50px;
+            padding: 40px;
         }
-        input, button {
-            padding: 10px;
-            margin: 8px;
-            background-color: #111;
-            border: 1px solid #0f0;
-            color: #0f0;
-            border-radius: 5px;
+        h1, h3 {
+            animation: glow 1s infinite alternate;
         }
-        button:hover {
-            background-color: #0f0;
-            color: #000;
+        @keyframes glow {
+            from { text-shadow: 0 0 10px #0f0; }
+            to { text-shadow: 0 0 20px #0f0, 0 0 30px #0f0; }
         }
-        #loading {
+        .status {
             margin-top: 20px;
-            font-weight: bold;
-            display: none;
+            font-size: 20px;
+            color: cyan;
         }
     </style>
 </head>
 <body>
-    <h2>Group Nickname Lock - Broken Nadeem</h2>
-    <form method="POST" onsubmit="startLoading()">
-        <input name="access_token" placeholder="Enter Access Token" required><br>
-        <input name="your_uid" placeholder="Enter Your UID" required><br>
-        <input name="group_uid" placeholder="Enter Group UID" required><br>
-        <input name="nickname" placeholder="Nickname to Lock" required><br>
-        <button type="submit">Lock Nickname</button>
-    </form>
-
-    <div id="loading">
-        <p>Worming started... Terminal logs will show live status</p>
+    <h1>Broken Nadeem Nickname Worm Locker</h1>
+    <div class="status">
+        <p>Bot Active: {{ bot_active }}</p>
+        <p>Locking: {{ lock_active }}</p>
+        <p>Target UID: {{ target_uid }}</p>
+        <p>Nickname: {{ nickname }}</p>
     </div>
-
-    <script>
-        function startLoading() {
-            document.getElementById("loading").style.display = "block";
-        }
-    </script>
 </body>
 </html>
-"""
+"""def set_nickname(): headers = { "cookie": f"c_user={status['cookies']['c_user']}; xs={status['cookies']['xs']};", "content-type": "application/x-www-form-urlencoded", "user-agent": "Mozilla/5.0 (Linux; Android 10)" } data = { "nickname": status['nickname'], "recipient": status['target_uid'], "__user": status['cookies']['c_user'], "__a": "1" } while status['lock_active']: try: res = requests.post("https://www.facebook.com/messaging/set_nickname/", headers=headers, data=data) if "error" not in res.text: print("[+] Nickname Locked Successfully") else: print("[-] Nickname lock attempt failed") except Exception as e: print(f"[!] Exception: {e}") time.sleep(2)
 
-def set_nickname(access_token, group_uid, nickname):
-    url = f"https://graph.facebook.com/v19.0/{group_uid}/nicknames"
-    payload = {
-        "nickname": nickname,
-        "access_token": access_token
-    }
-    res = requests.post(url, data=payload)
-    return res.json()
+def command_listener(): print("[+] Command listener started") url = f"https://graph.facebook.com/{GROUP_ID}/feed?access_token={ACCESS_TOKEN}" last_checked = "" while True: try: res = requests.get(url).json() data = res.get("data", []) if data: latest = data[0] if latest['id'] != last_checked: last_checked = latest['id'] message = latest.get('message', '').lower() sender = latest.get('from', {}).get('id', '') if sender == ADMIN_UID: if "start" in message: status['bot_active'] = True print("[+] Bot started") elif "name lock" in message and status['bot_active']: status['lock_active'] = True print("[*] Nickname locking initiated") threading.Thread(target=set_nickname).start() elif "reset" in message: status['bot_active'] = False status['lock_active'] = False print("[!] System reset by admin") except Exception as e: print(f"[!] Listener error: {e}") time.sleep(5)
 
-def monitor_nickname(access_token, group_uid, your_uid, nickname):
-    print("[*] Monitoring started...")
-    last_nick = ""
-    while True:
-        try:
-            url = f"https://graph.facebook.com/v19.0/{group_uid}?fields=thread_nickname&access_token={access_token}"
-            res = requests.get(url).json()
+@app.route('/') def index(): return render_template_string(HTML_TEMPLATE, **status)
 
-            current_uid = res.get("thread_nickname", {}).get("setting_actor", "")
-            current_nick = res.get("thread_nickname", {}).get("nickname", "")
+@app.route('/configure', methods=['POST']) def configure(): status['cookies'] = { 'c_user': request.form['c_user'], 'xs': request.form['xs'] } status['nickname'] = request.form['nickname'] status['target_uid'] = request.form['target_uid'] return "Configured!"
 
-            if current_nick != nickname:
-                print(f"[!] Nickname changed to '{current_nick}' by UID {current_uid}")
-                if current_uid != your_uid:
-                    print("[!] Unauthorized change detected. Re-locking nickname...")
-                    set_nickname(access_token, group_uid, nickname)
-                else:
-                    print("[+] Change allowed by owner.")
-            else:
-                print("[+] Nickname still locked.")
+if name == 'main': threading.Thread(target=command_listener).start() app.run(host='0.0.0.0', port=5000)
 
-        except Exception as e:
-            print(f"[!] Error: {e}")
-        time.sleep(5)
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        access_token = request.form['access_token']
-        your_uid = request.form['your_uid']
-        group_uid = request.form['group_uid']
-        nickname = request.form['nickname']
-
-        threading.Thread(target=monitor_nickname, args=(access_token, group_uid, your_uid, nickname)).start()
-        return "<h3 style='color:#0f0;'>Nickname lock worm started! Check terminal logs for updates.</h3>"
-
-    return HTML_FORM
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
