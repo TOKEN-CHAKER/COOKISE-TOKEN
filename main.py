@@ -5,7 +5,7 @@ import os
 app = Flask(__name__)
 
 # === Group Settings ===
-group_id = "YOUR_GROUP_THREAD_ID"  # <- Yahan apna Facebook group thread ID lagao
+group_id = "YOUR_GROUP_THREAD_ID"  # <- 61573436296849
 nickname_lock = True
 name_lock = True
 
