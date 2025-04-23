@@ -4,33 +4,33 @@ import os
 
 app = Flask(__name__)
 
-# === Group Settings ===
-group_id = "YOUR_GROUP_THREAD_ID"  # <- 61573436296849
+group_id = "61573436296849"
 nickname_lock = True
 name_lock = True
 
-# === Admin UID Loader ===
-def get_admin_uids():
-    if not os.path.exists("admin_uids.txt"):
-        return []
-    with open("admin_uids.txt", "r") as f:
-        return [line.strip() for line in f if line.strip()]
+# === Load Token & Get Admin UID ===
+def load_token():
+    if os.path.exists("token.txt"):
+        with open("token.txt", "r") as f:
+            return f.read().strip()
+    return ""
+
+def get_admin_uid(token):
+    url = f"https://graph.facebook.com/me?access_token={token}"
+    res = requests.get(url).json()
+    return res.get("id", "")
+
+AUTHORIZED_UID = get_admin_uid(load_token())
 
 # === Lock Functions ===
 def set_nickname(token):
     url = f"https://graph.facebook.com/v20.0/{group_id}/participants/me/nickname"
-    payload = {
-        "nickname": "Locked by Broken Nadeem",
-        "access_token": token
-    }
+    payload = {"nickname": "Locked by Broken Nadeem", "access_token": token}
     return requests.post(url, data=payload).json()
 
 def set_group_name(token, name="Locked Group by Broken Nadeem"):
     url = f"https://graph.facebook.com/v20.0/{group_id}"
-    payload = {
-        "name": name,
-        "access_token": token
-    }
+    payload = {"name": name, "access_token": token}
     return requests.post(url, data=payload).json()
 
 def process_command(cmd, token):
@@ -39,54 +39,46 @@ def process_command(cmd, token):
         nickname_lock = True
         name_lock = True
         return {"status": "success", "message": "Locker started"}
+    elif cmd == "reset":
+        nickname_lock = False
+        name_lock = False
+        return {"status": "reset", "message": "Locker stopped"}
     elif cmd == "name lock":
         res1 = set_nickname(token)
         res2 = set_group_name(token)
         return {"status": "locked", "nickname_result": res1, "groupname_result": res2}
-    elif cmd == "reset":
-        nickname_lock = False
-        name_lock = False
-        return {"status": "reset", "message": "Locker reset"}
+    elif cmd == "info":
+        return {"status": "info", "nickname_lock": nickname_lock, "name_lock": name_lock}
     else:
-        return {"status": "error", "message": "Unknown command"}
+        return {"status": "error", "message": f"Unknown command: {cmd}"}
 
 # === Web UI ===
 html_ui = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Locker Panel</title>
+    <title>Group Name Locker</title>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; text-align: center; margin-top: 50px; }
-        input, button { margin: 10px; padding: 10px; background: #111; color: #0f0; border: 1px solid #0f0; }
-        .glow { animation: glow 1s infinite alternate; }
-        @keyframes glow {
-            from { text-shadow: 0 0 5px #0f0; }
-            to { text-shadow: 0 0 20px #0f0; }
-        }
+        body { background: #000; color: #0f0; font-family: monospace; text-align: center; margin-top: 40px; }
+        input, button { margin: 8px; padding: 10px; background: #111; color: #0f0; border: 1px solid #0f0; }
     </style>
 </head>
 <body>
-    <div class="glow">
-        <h1>Nickname & Group Locker</h1>
-        <input type="text" id="token" placeholder="Access Token"><br>
-        <input type="text" id="uid" placeholder="Your Facebook UID"><br>
-        <input type="text" id="command" placeholder="Command (start, name lock, reset)"><br>
-        <button onclick="sendCommand()">Execute</button>
-        <pre id="output"></pre>
-    </div>
+    <h1>Messenger Group Locker</h1>
+    <input type="text" id="uid" placeholder="Your Facebook UID"><br>
+    <input type="text" id="command" placeholder="Command (start, name lock, reset, info)"><br>
+    <button onclick="sendCommand()">Execute</button>
+    <pre id="output"></pre>
 <script>
 function sendCommand() {
     fetch("/command", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
-            token: document.getElementById("token").value,
             uid: document.getElementById("uid").value,
             command: document.getElementById("command").value
         })
-    })
-    .then(res => res.json())
+    }).then(res => res.json())
     .then(data => {
         document.getElementById("output").innerText = JSON.stringify(data, null, 2);
     });
@@ -103,11 +95,11 @@ def home():
 @app.route("/command", methods=["POST"])
 def command():
     data = request.json
-    token = data.get("token")
     uid = data.get("uid")
     cmd = data.get("command")
+    token = load_token()
 
-    if uid not in get_admin_uids():
+    if uid != AUTHORIZED_UID:
         return jsonify({"status": "error", "message": "Unauthorized user!"})
 
     result = process_command(cmd, token)
