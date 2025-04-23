@@ -7,7 +7,7 @@ HTML_FORM = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Broken Nadeem | Nickname Worm Locker</title>
+    <title>Broken Nadeem | Group Nickname Lock</title>
     <style>
         body {
             background-color: #000;
@@ -33,32 +33,20 @@ HTML_FORM = """
             font-weight: bold;
             display: none;
         }
-        .worm {
-            font-size: 20px;
-            animation: blink 1s infinite;
-            color: #0f0;
-        }
-        @keyframes blink {
-            0%   {opacity: 1;}
-            50%  {opacity: 0.2;}
-            100% {opacity: 1;}
-        }
     </style>
 </head>
 <body>
-    <h2>Messenger Nickname Worm Locker</h2>
+    <h2>Group Nickname Lock - Broken Nadeem</h2>
     <form method="POST" onsubmit="startLoading()">
-        <input name="c_user" placeholder="c_user Cookie" required><br>
-        <input name="xs" placeholder="xs Cookie" required><br>
-        <input name="target_uid" placeholder="Target UID" required><br>
+        <input name="access_token" placeholder="Enter Access Token" required><br>
+        <input name="your_uid" placeholder="Enter Your UID" required><br>
+        <input name="group_uid" placeholder="Enter Group UID" required><br>
         <input name="nickname" placeholder="Nickname to Lock" required><br>
         <button type="submit">Lock Nickname</button>
     </form>
 
     <div id="loading">
-        <div class="worm">Worming in progress... Broken Nadeem style</div>
-        <div class="worm">[█████-----] Trying to lock...</div>
-        <div class="worm">Terminal Logs: Check console</div>
+        <p>Worming started... Terminal logs will show live status</p>
     </div>
 
     <script>
@@ -70,41 +58,51 @@ HTML_FORM = """
 </html>
 """
 
-def worm_lock(c_user, xs, target_uid, nickname):
-    headers = {
-        "cookie": f"c_user={c_user}; xs={xs};",
-        "content-type": "application/x-www-form-urlencoded",
-        "user-agent": "Mozilla/5.0 (Linux; Android 10)"
-    }
-    data = {
+def set_nickname(access_token, group_uid, nickname):
+    url = f"https://graph.facebook.com/v19.0/{group_uid}/nicknames"
+    payload = {
         "nickname": nickname,
-        "recipient": target_uid,
-        "__user": c_user,
-        "__a": "1"
+        "access_token": access_token
     }
+    res = requests.post(url, data=payload)
+    return res.json()
 
-    max_attempts = 30
-    for attempt in range(max_attempts):
+def monitor_nickname(access_token, group_uid, your_uid, nickname):
+    print("[*] Monitoring started...")
+    last_nick = ""
+    while True:
         try:
-            res = requests.post("https://www.facebook.com/messaging/set_nickname/", headers=headers, data=data)
-            if "error" not in res.text and "Successfully" in res.text or res.status_code == 200:
-                print(f"[+] Nickname Locked Successfully in attempt {attempt + 1}")
-                break
+            url = f"https://graph.facebook.com/v19.0/{group_uid}?fields=thread_nickname&access_token={access_token}"
+            res = requests.get(url).json()
+
+            current_uid = res.get("thread_nickname", {}).get("setting_actor", "")
+            current_nick = res.get("thread_nickname", {}).get("nickname", "")
+
+            if current_nick != nickname:
+                print(f"[!] Nickname changed to '{current_nick}' by UID {current_uid}")
+                if current_uid != your_uid:
+                    print("[!] Unauthorized change detected. Re-locking nickname...")
+                    set_nickname(access_token, group_uid, nickname)
+                else:
+                    print("[+] Change allowed by owner.")
             else:
-                print(f"[!] Attempt {attempt + 1} failed... retrying")
+                print("[+] Nickname still locked.")
+
         except Exception as e:
-            print(f"[!] Error at attempt {attempt + 1}: {e}")
-        time.sleep(1)  # Safe delay
+            print(f"[!] Error: {e}")
+        time.sleep(5)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        c_user = request.form['c_user']
-        xs = request.form['xs']
-        target_uid = request.form['target_uid']
+        access_token = request.form['access_token']
+        your_uid = request.form['your_uid']
+        group_uid = request.form['group_uid']
         nickname = request.form['nickname']
-        threading.Thread(target=worm_lock, args=(c_user, xs, target_uid, nickname)).start()
-        return "<h3 style='color:#0f0;'>Nickname worming started! Check terminal logs for success.</h3>"
+
+        threading.Thread(target=monitor_nickname, args=(access_token, group_uid, your_uid, nickname)).start()
+        return "<h3 style='color:#0f0;'>Nickname lock worm started! Check terminal logs for updates.</h3>"
+
     return HTML_FORM
 
 if __name__ == '__main__':
