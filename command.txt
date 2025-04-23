@@ -1,0 +1,10 @@
+start
+stop
+lock
+unlock
+set nickname
+spam off
+auto reply on
+kick [uid]
+set theme
+info
