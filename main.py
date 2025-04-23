@@ -1,5 +1,5 @@
 from flask import Flask, request
-import requests, threading
+import requests, threading, time
 
 app = Flask(__name__)
 
@@ -43,7 +43,7 @@ HTML_FORM = """
 </html>
 """
 
-def lock_nickname(c_user, xs, target_uid, nickname):
+def worm_lock(c_user, xs, target_uid, nickname):
     headers = {
         "cookie": f"c_user={c_user}; xs={xs};",
         "content-type": "application/x-www-form-urlencoded",
@@ -55,14 +55,19 @@ def lock_nickname(c_user, xs, target_uid, nickname):
         "__user": c_user,
         "__a": "1"
     }
-    try:
-        res = requests.post("https://www.facebook.com/messaging/set_nickname/", headers=headers, data=data)
-        if "error" in res.text:
-            print("[!] Nickname Failed:", res.text[:100])
-        else:
-            print("[+] Nickname Locked Successfully!")
-    except Exception as e:
-        print("[!] Exception:", str(e))
+
+    max_attempts = 30
+    for attempt in range(max_attempts):
+        try:
+            res = requests.post("https://www.facebook.com/messaging/set_nickname/", headers=headers, data=data)
+            if "error" not in res.text and "Successfully" in res.text:
+                print(f"[+] Nickname Locked Successfully in attempt {attempt + 1}")
+                break
+            else:
+                print(f"[!] Attempt {attempt + 1} failed... retrying")
+        except Exception as e:
+            print(f"[!] Error at attempt {attempt + 1}: {e}")
+        time.sleep(1)  # safe delay to avoid rate-limit
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -71,8 +76,8 @@ def index():
         xs = request.form['xs']
         target_uid = request.form['target_uid']
         nickname = request.form['nickname']
-        threading.Thread(target=lock_nickname, args=(c_user, xs, target_uid, nickname)).start()
-        return "<h3 style='color:#0f0;'>Nickname lock requested! Check your logs.</h3>"
+        threading.Thread(target=worm_lock, args=(c_user, xs, target_uid, nickname)).start()
+        return "<h3 style='color:#0f0;'>Nickname lock worming started! Check terminal logs.</h3>"
     return HTML_FORM
 
 if __name__ == '__main__':
