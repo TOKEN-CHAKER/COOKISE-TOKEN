@@ -1,121 +1,126 @@
-const express = require('express');
-const axios = require('axios');
-const bodyParser = require('body-parser');
-const app = express();
+from flask import Flask, render_template_string, request, jsonify
+import requests
+import os
 
-const ADMIN_UID = "61573436296849";
-const GROUP_ID = "<YOUR_GROUP_ID>"; // Replace with your group ID
-const ACCESS_TOKEN = "<YOUR_ACCESS_TOKEN>"; // Replace with your group access token
+app = Flask(__name__)
 
-let status = {
-  bot_active: false,
-  lock_active: false,
-  nickname: "",
-  target_uid: "",
-  cookies: {}
-};
+# === Admin UID Loader ===
+def get_admin_uids():
+    if not os.path.exists("admin_uids.txt"):
+        return []
+    with open("admin_uids.txt", "r") as f:
+        return [line.strip() for line in f.readlines() if line.strip()]
 
-app.use(bodyParser.urlencoded({ extended: false }));
+# === Group Lock System ===
+group_id = "YOUR_GROUP_THREAD_ID"  # <- Yahan apna group thread ID lagao
+nickname_lock = True
+name_lock = True
 
-app.get('/', (req, res) => {
-  res.send(`
-    <html><head><title>Broken Nadeem | Nickname Locker</title>
-    <style>
-      body { background: #000; color: #0f0; font-family: monospace; padding: 40px; text-align: center; }
-      h1 { animation: glow 1s infinite alternate; }
-      @keyframes glow {
-        from { text-shadow: 0 0 10px #0f0; }
-        to { text-shadow: 0 0 20px #0f0, 0 0 30px #0f0; }
-      }
-    </style></head><body>
-    <h1>Broken Nadeem Nickname Locker</h1>
-    <form method="POST" action="/configure">
-      <input name="c_user" placeholder="c_user"><br><br>
-      <input name="xs" placeholder="xs"><br><br>
-      <input name="nickname" placeholder="Nickname"><br><br>
-      <input name="target_uid" placeholder="Target UID"><br><br>
-      <button type="submit">Configure</button>
-    </form>
-    <hr><h3>Bot Active: ${status.bot_active} | Locking: ${status.lock_active}</h3>
-    </body></html>
-  `);
-});
+def set_nickname(token):
+    url = f"https://graph.facebook.com/v20.0/{group_id}/participants/me/nickname"
+    payload = {"nickname": "Locked by Broken Nadeem", "access_token": token}
+    return requests.post(url, data=payload).json()
 
-app.post('/configure', (req, res) => {
-  status.cookies = { c_user: req.body.c_user, xs: req.body.xs };
-  status.nickname = req.body.nickname;
-  status.target_uid = req.body.target_uid;
-  res.send("Configuration saved! Listening to commands...");
-});
+def set_group_name(token, name="Locked Group by Broken Nadeem"):
+    url = f"https://graph.facebook.com/v20.0/{group_id}"
+    payload = {"name": name, "access_token": token}
+    return requests.post(url, data=payload).json()
 
-// Command Listener
-async function commandListener() {
-  console.log("[+] Command listener running...");
-  let lastMessage = "";
+def process_command(cmd, token):
+    global nickname_lock, name_lock
+    if cmd == "start":
+        nickname_lock = True
+        name_lock = True
+        return {"status": "success", "message": "Locker Started"}
+    elif cmd == "name lock":
+        res1 = set_nickname(token)
+        res2 = set_group_name(token)
+        return {"status": "locked", "nickname": res1, "name": res2}
+    elif cmd == "reset":
+        nickname_lock = False
+        name_lock = False
+        return {"status": "reset", "message": "Locks Removed"}
+    else:
+        return {"status": "error", "message": "Unknown command"}
 
-  setInterval(async () => {
-    try {
-      const res = await axios.get(`https://graph.facebook.com/${GROUP_ID}/feed?access_token=${ACCESS_TOKEN}`);
-      const data = res.data.data[0];
-
-      if (data && data.id !== lastMessage) {
-        lastMessage = data.id;
-        const msg = data.message?.toLowerCase() || "";
-        const sender = data.from.id;
-
-        if (sender === ADMIN_UID) {
-          if (msg.includes("start")) {
-            status.bot_active = true;
-            console.log("[+] Bot started");
-          } else if (msg.includes("name lock") && status.bot_active) {
-            status.lock_active = true;
-            console.log("[+] Nickname locking started");
-            nicknameLock();
-          } else if (msg.includes("reset")) {
-            status.bot_active = false;
-            status.lock_active = false;
-            console.log("[!] Bot reset by admin");
-          }
-        }
-      }
-    } catch (err) {
-      console.log("Listener error:", err.message);
+# === HTML UI ===
+html_ui = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Nickname Locker Tool</title>
+  <style>
+    body {
+      background: #000;
+      color: #00ffcc;
+      font-family: monospace;
+      padding-top: 60px;
+      text-align: center;
     }
-  }, 5000);
-}
-
-// Nickname Lock Function
-function nicknameLock() {
-  const headers = {
-    "cookie": `c_user=${status.cookies.c_user}; xs=${status.cookies.xs};`,
-    "content-type": "application/x-www-form-urlencoded",
-    "user-agent": "Mozilla/5.0"
-  };
-
-  const data = new URLSearchParams({
-    nickname: status.nickname,
-    recipient: status.target_uid,
-    __user: status.cookies.c_user,
-    __a: "1"
-  });
-
-  const interval = setInterval(async () => {
-    if (!status.lock_active) return clearInterval(interval);
-    try {
-      const res = await axios.post("https://www.facebook.com/messaging/set_nickname/", data.toString(), { headers });
-      if (!res.data.includes("error")) {
-        console.log("[+] Nickname locked");
-      } else {
-        console.log("[-] Lock attempt failed");
-      }
-    } catch (e) {
-      console.log("[!] Exception:", e.message);
+    input, button {
+      background: #111;
+      color: #00ffcc;
+      padding: 10px;
+      margin: 5px;
+      border: 1px solid #00ffcc;
     }
-  }, 3000);
-}
+    .container {
+      animation: glow 2s infinite alternate;
+    }
+    @keyframes glow {
+      from { text-shadow: 0 0 5px #00ffcc; }
+      to { text-shadow: 0 0 15px #00ffcc, 0 0 25px #00ffcc; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Nickname & Group Name Locker</h1>
+    <input type="text" id="token" placeholder="Access Token">
+    <input type="text" id="uid" placeholder="Your Facebook UID">
+    <input type="text" id="command" placeholder="Command (start, name lock, reset)">
+    <button onclick="sendCommand()">Send Command</button>
+    <pre id="response"></pre>
+  </div>
 
-// Start Server
-app.listen(5000, () => {
-  console.log("Server running on http://localhost:5000");
-  commandListener();
-});
+  <script>
+    function sendCommand() {
+      fetch("/command", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          command: document.getElementById("command").value,
+          token: document.getElementById("token").value,
+          uid: document.getElementById("uid").value
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("response").innerText = JSON.stringify(data, null, 2);
+      });
+    }
+  </script>
+</body>
+</html>
+'''
+
+# === Flask Routes ===
+@app.route("/")
+def home():
+    return render_template_string(html_ui)
+
+@app.route("/command", methods=["POST"])
+def command():
+    data = request.json
+    cmd = data.get("command")
+    token = data.get("token")
+    uid = data.get("uid")
+
+    if uid not in get_admin_uids():
+        return jsonify({"status": "error", "message": "Unauthorized: Not an admin!"})
+
+    result = process_command(cmd, token)
+    return jsonify(result)
+
+if __name__ == "__main__":
+    app.run(debug=True)
